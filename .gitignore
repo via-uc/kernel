@@ -1,0 +1,5 @@
+.hello_world.[kmo]*
+.tmp_versions/
+hello_world.[kmo]*
+modules.order
+Module.symvers
