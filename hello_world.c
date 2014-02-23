@@ -21,6 +21,8 @@ struct helloworld_dev
 static dev_t helloworld_dev_number;		// The allocated device number
 struct class *helloworld_class;			// Tie with the device model
 
+char* hello_world_text;
+
 
 int helloworld_open(struct inode *inode, struct file *file)
 {
@@ -38,17 +40,23 @@ int helloworld_release(struct inode *inode, struct file *file)
 ssize_t helloworld_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	printk(DRIVER_NAME " reading...\n");
-	return 0;
+	if(hello_world_text)
+		copy_to_user(buf, hello_world_text, strlen(hello_world_text));
+
+	return hello_world_text ? strlen(hello_world_text) : 0;
 }
 
 
 ssize_t helloworld_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	char text[count];
+	if(hello_world_text)
+		kfree(hello_world_text);
+
+	hello_world_text = kmalloc(count, GFP_KERNEL);
 	printk(DRIVER_NAME " writing...\n");
-	copy_from_user(text, buf, count - 1);
-	text[count - 1] = '\0';
-	printk("Got %zu bytes '%s'\n", count - 1, text);
+	copy_from_user(hello_world_text, buf, count - 1);
+	hello_world_text[count - 1] = '\0';
+	printk("Got %zu bytes '%s'\n", count - 1, hello_world_text);
 	return count;
 }
 
@@ -67,6 +75,7 @@ static struct file_operations helloworld_fops =
 static int __init helloworld_init(void)
 {
 	int ret;
+	hello_world_text = 0;
 	// request dynamic alloc. of device major number (0=start minorno, 1=no of minor devices
 	if(alloc_chrdev_region(&helloworld_dev_number,0,1,DRIVER_NAME) < 0)
 	{
@@ -103,6 +112,8 @@ static int __init helloworld_init(void)
 // Module exit
 static void __exit helloworld_exit(void)
 {
+	if(hello_world_text)
+		kfree(hello_world_text);
 	// release major number
 	unregister_chrdev_region((helloworld_dev_number), 1);
 	device_destroy(helloworld_class, MKDEV(MAJOR(helloworld_dev_number),0));
